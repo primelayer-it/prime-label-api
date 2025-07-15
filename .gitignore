@@ -1,0 +1,33 @@
+# Node
+/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+
+# testing
+/coverage
+
+# production
+/build
+
+# Build output
+/dist/
+
+# Logs
+logs
+*.log
+logs/*
+
+# test Files
+/Test_data
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
