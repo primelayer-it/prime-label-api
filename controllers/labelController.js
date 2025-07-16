@@ -1,17 +1,7 @@
 const Label = require('../models/Label');
 const LabelTemplate = require('../models/LabelTemplate');
 
-// Create a new label
-const createLabel = async (req, res) => {
-  try {
-    const label = await Label.create(req.body);
-    res.status(201).json(label);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-// Get all labels (optionally filter by type/version)
+// @desc    Get all labels (optionally filter by type/version)
 // @route   GET /api/labels
 async function getLabels(req, res, next) {
   try {
@@ -127,7 +117,6 @@ async function getLabelBySponsorTrialKit(req, res, next) {
 }
 
 module.exports = {
-  createLabel,
   getLabels,
   getLabelById,
   getLabelByBatchNumber,
