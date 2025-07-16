@@ -21,11 +21,18 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config();
 connectDB();
 const app = express();
-// Protects against very large payloads DOS’ing your server.
+// Protects against very large payloads DOS'ing your server.
 app.use(express.json({ limit: '10kb' }));
 
+// CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' ? 'https://prime-label-frontend.vercel.app' : 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+};
+
 //Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Sanitize request data to prevent NoSQL injection

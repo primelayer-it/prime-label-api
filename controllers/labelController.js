@@ -1,7 +1,17 @@
-const Label = require("../models/Label");
-const LabelTemplate = require("../models/LabelTemplate");
+const Label = require('../models/Label');
+const LabelTemplate = require('../models/LabelTemplate');
 
-// @desc    Get all labels (optionally filter by type/version)
+// Create a new label
+const createLabel = async (req, res) => {
+  try {
+    const label = await Label.create(req.body);
+    res.status(201).json(label);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Get all labels (optionally filter by type/version)
 // @route   GET /api/labels
 async function getLabels(req, res, next) {
   try {
@@ -21,7 +31,7 @@ async function getLabels(req, res, next) {
 async function getLabelById(req, res, next) {
   try {
     const label = await Label.findById(req.params.id);
-    if (!label) return res.status(404).json({ message: "Label not found" });
+    if (!label) return res.status(404).json({ message: 'Label not found' });
     res.json(label);
   } catch (err) {
     next(err);
@@ -34,10 +44,7 @@ async function getLabelByBatchNumber(req, res, next) {
   try {
     const { batchNumber } = req.params;
     const label = await Label.findOne({ batchNumber });
-    if (!label)
-      return res
-        .status(404)
-        .json({ message: "Label not found for batch Number" + batchNumber });
+    if (!label) return res.status(404).json({ message: 'Label not found for batch Number' + batchNumber });
     res.json(label);
   } catch (err) {
     next(err);
@@ -52,8 +59,7 @@ async function getLabelByProtocolAndKit(req, res, next) {
     const label = await Label.findOne({ protocolNumber, kitNumber });
     if (!label) {
       return res.status(404).json({
-        message:
-          "Label not found for protocol ${protocolNumber} and kit ${kitNumber} ",
+        message: 'Label not found for protocol ${protocolNumber} and kit ${kitNumber} ',
       });
     }
     res.json(label);
@@ -70,9 +76,7 @@ async function getLabelByIdentifier(req, res, next) {
     const { identifierCode } = req.params;
     const label = await Label.findOne({ identifierCode });
     if (!label) {
-      return res
-        .status(404)
-        .json({ message: "Label not found for that identifierCode" });
+      return res.status(404).json({ message: 'Label not found for that identifierCode' });
     }
     res.json(label);
   } catch (err) {
@@ -93,9 +97,7 @@ async function getLabelBySponsorTrialBatch(req, res, next) {
     });
 
     if (!label) {
-      return res
-        .status(404)
-        .json({ message: "Label not found for that sponsor/trial/batch" });
+      return res.status(404).json({ message: 'Label not found for that sponsor/trial/batch' });
     }
     res.json(label);
   } catch (err) {
@@ -116,9 +118,7 @@ async function getLabelBySponsorTrialKit(req, res, next) {
     });
 
     if (!label) {
-      return res
-        .status(404)
-        .json({ message: "Label not found for that sponsor/trial/kit" });
+      return res.status(404).json({ message: 'Label not found for that sponsor/trial/kit' });
     }
     res.json(label);
   } catch (err) {
@@ -127,6 +127,7 @@ async function getLabelBySponsorTrialKit(req, res, next) {
 }
 
 module.exports = {
+  createLabel,
   getLabels,
   getLabelById,
   getLabelByBatchNumber,
