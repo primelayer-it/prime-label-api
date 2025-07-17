@@ -21,6 +21,10 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config();
 connectDB();
 const app = express();
+
+// Trust proxy - Required for rate limiting behind reverse proxies (like Render.com)
+app.set('trust proxy', 1);
+
 // Protects against very large payloads DOS'ing your server.
 app.use(express.json({ limit: '10kb' }));
 
