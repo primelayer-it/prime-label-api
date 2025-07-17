@@ -21,17 +21,13 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config();
 connectDB();
 const app = express();
-
-// Trust proxy - Required for rate limiting behind reverse proxies (like Render.com)
-app.set('trust proxy', 1);
-
 // Protects against very large payloads DOS'ing your server.
 app.use(express.json({ limit: '10kb' }));
 
 // CORS configuration
 const corsOptions = {
   origin: [
-    'https://prime-label-frontend-x7uo.vercel.app',
+    'https://prime-label-frontend.vercel.app/',
     'http://localhost:5173', // For local development
     'http://localhost:3000', // Alternative local port
   ],
