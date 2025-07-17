@@ -27,7 +27,7 @@ app.use(express.json({ limit: '10kb' }));
 // CORS configuration
 const corsOptions = {
   origin: [
-    'https://prime-label-frontend.vercel.app/',
+    'https://prime-label-frontend-x7uo.vercel.app/',
     'http://localhost:5173', // For local development
     'http://localhost:3000', // Alternative local port
   ],
