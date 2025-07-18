@@ -21,26 +21,11 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config();
 connectDB();
 const app = express();
-// Protects against very large payloads DOS'ing your server.
+// Protects against very large payloads DOS’ing your server.
 app.use(express.json({ limit: '10kb' }));
 
-// CORS configuration
-const corsOptions = {
-  origin: [
-    'https://prime-label-frontend-x7uo.vercel.app/',
-
-    'http://localhost:5173', // For local development
-    'http://localhost:3000', // Alternative local port
-    'http://www.clinicallabel.io',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 86400, // 24 hours
-};
-
 //Middleware
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 // Sanitize request data to prevent NoSQL injection
