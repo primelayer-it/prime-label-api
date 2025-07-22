@@ -17,9 +17,6 @@ require('./config/passport');
 // Initialize app
 const app = express();
 
-// Get allowed origins from env
-const allowedOrigins = (process.env.FRONTEND_URLS || '').split(',').map((url) => url.trim());
-
 // Connect to MongoDB
 const MONGO_URI = process.env.NODE_ENV === 'production' ? process.env.MONGO_URI_PROD : process.env.MONGO_URI_DEV;
 
@@ -41,21 +38,29 @@ mongoose
 
 // Middleware
 app.use(express.json());
+
+// CORS configuration
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    credentials: true,
+    origin: true, // Reflect the request origin, enables all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow all common HTTP methods
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allow common headers
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    credentials: true, // Allow credentials
+    maxAge: 86400, // Cache preflight requests for 24 hours
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   }),
 );
+
+// Add headers for better CORS support
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  next();
+});
 
 // Session middleware
 app.use(
@@ -97,4 +102,5 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  console.log('CORS enabled for all origins with credentials support');
 });
