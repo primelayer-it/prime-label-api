@@ -26,18 +26,19 @@ passport.use(
           firstName: profile.name.givenName,
           lastName: profile.name.familyName,
           email: profile.emails[0].value,
-          // Generate random password for OAuth users
-          password: 'google-oauth-' + Math.random().toString(36).slice(-8),
+          password: 'google-oauth-' + Math.random().toString(36).slice(-8), // Generate random password for OAuth users
         });
 
         return done(null, user);
       } catch (error) {
+        console.error('Google auth error:', error);
         return done(error, null);
       }
     },
   ),
 );
 
+// These are required even though we're using JWT
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
