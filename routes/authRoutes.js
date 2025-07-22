@@ -32,13 +32,32 @@ router.get('/debug', (req, res) => {
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ? 'Set' : 'Not Set',
     currentUrl: `${req.protocol}://${req.get('host')}`,
     googleCallbackUrl: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+    referer: req.headers.referer,
+    origin: req.headers.origin,
   };
   console.log('Debug Info:', debug);
   res.json(debug);
 });
 
+// Store frontend URL in session
+router.use((req, res, next) => {
+  if (req.headers.referer) {
+    const url = new URL(req.headers.referer);
+    req.session.frontendUrl = url.origin;
+    console.log('Stored frontend URL:', req.session.frontendUrl);
+  }
+  next();
+});
+
 // Google OAuth routes
 router.get('/google', (req, res, next) => {
+  // Store the frontend URL in session
+  if (req.headers.referer) {
+    const url = new URL(req.headers.referer);
+    req.session.frontendUrl = url.origin;
+    console.log('Stored frontend URL for OAuth:', req.session.frontendUrl);
+  }
+
   console.log('Starting Google OAuth flow');
   passport.authenticate('google', {
     scope: ['profile', 'email'],
@@ -67,15 +86,22 @@ router.get(
       // Generate JWT token
       const token = generateToken(req.user._id);
 
-      // Get the frontend URL from environment
-      const frontendUrl = process.env.FRONTEND_URLS.split(',')[0].trim();
-      console.log('Redirecting to frontend:', `${frontendUrl}/oauth-callback?token=${token}`);
+      // Get the stored frontend URL or fallback to environment
+      let frontendUrl = req.session.frontendUrl;
+      if (!frontendUrl) {
+        console.log('No stored frontend URL, using environment default');
+        frontendUrl = process.env.FRONTEND_URLS.split(',')[0].trim();
+      }
+      console.log('Using frontend URL:', frontendUrl);
+
+      const redirectUrl = `${frontendUrl}/oauth-callback?token=${token}`;
+      console.log('Redirecting to:', redirectUrl);
 
       // Redirect to frontend with token
-      res.redirect(`${frontendUrl}/oauth-callback?token=${token}`);
+      res.redirect(redirectUrl);
     } catch (error) {
       console.error('OAuth callback error:', error);
-      const frontendUrl = process.env.FRONTEND_URLS.split(',')[0].trim();
+      const frontendUrl = req.session.frontendUrl || process.env.FRONTEND_URLS.split(',')[0].trim();
       res.redirect(`${frontendUrl}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`);
     }
   },
