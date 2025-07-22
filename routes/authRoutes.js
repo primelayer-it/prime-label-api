@@ -39,28 +39,35 @@ router.get('/debug', (req, res) => {
 
 // Google OAuth routes
 router.get('/google', (req, res, next) => {
-  console.log('Starting Google OAuth. Redirect URL:', `${req.protocol}://${req.get('host')}/api/auth/google/callback`);
+  console.log('Starting Google OAuth flow');
   passport.authenticate('google', {
     scope: ['profile', 'email'],
+    prompt: 'select_account',
   })(req, res, next);
 });
 
 router.get(
   '/google/callback',
   (req, res, next) => {
-    console.log('Received callback from Google');
+    console.log('Received Google callback');
     passport.authenticate('google', {
       session: false,
-      failureRedirect: '/login',
+      failureRedirect: '/login?error=google_auth_failed',
     })(req, res, next);
   },
-  (req, res) => {
+  async (req, res) => {
     try {
-      console.log('Processing Google callback');
+      console.log('Processing Google callback, user:', req.user?._id);
+
+      if (!req.user) {
+        console.error('No user data in request');
+        throw new Error('Authentication failed');
+      }
+
       // Generate JWT token
       const token = generateToken(req.user._id);
 
-      // Get the frontend URL from environment or use default
+      // Get the frontend URL from environment
       const frontendUrl = process.env.FRONTEND_URLS.split(',')[0].trim();
       console.log('Redirecting to frontend:', `${frontendUrl}/oauth-callback?token=${token}`);
 
@@ -68,7 +75,8 @@ router.get(
       res.redirect(`${frontendUrl}/oauth-callback?token=${token}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
-      res.redirect(`${frontendUrl}/login?error=auth_failed`);
+      const frontendUrl = process.env.FRONTEND_URLS.split(',')[0].trim();
+      res.redirect(`${frontendUrl}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`);
     }
   },
 );
