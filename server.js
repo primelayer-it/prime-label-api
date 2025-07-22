@@ -42,12 +42,12 @@ app.use(express.json());
 // CORS configuration
 app.use(
   cors({
-    origin: true, // Reflect the request origin, enables all origins
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow all common HTTP methods
-    allowedHeaders: ['Content-Type', 'Authorization'], // Allow common headers
+    origin: true, // Reflect the request origin
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    credentials: true, // Allow credentials
-    maxAge: 86400, // Cache preflight requests for 24 hours
+    credentials: true,
+    maxAge: 86400,
     preflightContinue: false,
     optionsSuccessStatus: 204,
   }),
@@ -55,8 +55,11 @@ app.use(
 
 // Add headers for better CORS support
 app.use((req, res, next) => {
+  const origin = req.headers.origin;
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   next();
@@ -68,9 +71,14 @@ app.use(
     secret: process.env.SESSION_SECRET || 'your-session-secret',
     resave: false,
     saveUninitialized: false,
+    proxy: true, // Required for Heroku/Render SSL support
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production', // Only send cookie over HTTPS in production
+      httpOnly: true, // Prevents client-side access to the cookie
+      sameSite: 'none', // Required for cross-site requests
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined, // Adjust domain for production
     },
   }),
 );
@@ -103,4 +111,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
   console.log('CORS enabled for all origins with credentials support');
+  console.log('Session cookie configured for cross-origin access');
 });
