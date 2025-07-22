@@ -2,7 +2,12 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
 
-const BACKEND_URL = process.env.NODE_ENV === 'production' ? process.env.BACKEND_URL_PROD : process.env.BACKEND_URL_DEV;
+// Get the backend URLs from environment
+const BACKEND_URLS =
+  process.env.NODE_ENV === 'production' ? process.env.BACKEND_URLS.split(',').map((url) => url.trim()) : [process.env.BACKEND_URL_DEV];
+
+// Use the first backend URL as the default
+const BACKEND_URL = BACKEND_URLS[0];
 
 passport.use(
   new GoogleStrategy(
