@@ -1,115 +1,126 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const passport = require('passport');
-const session = require('express-session');
+const mongoose = require('mongoose');
+const connectDB = require('./config/db');
+const helmet = require('helmet'); // Security middleware
+const fs = require('fs');
+const path = require('path');
+const morgan = require('morgan'); // HTTP request logger
+const rfs = require('rotating-file-stream');
+const { limiter, speedLimiter } = require('./middleware/rateLimiter');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
 
-// Load env vars
+// Link Routes
+const labelRoutes = require('./routes/labelRoutes');
+
+//middleware
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
 dotenv.config();
-
-// Import routes
-const authRoutes = require('./routes/authRoutes');
-
-// Import passport config
-require('./config/passport');
-
-// Initialize app
+connectDB();
 const app = express();
+// Protects against very large payloads DOS’ing your server.
+app.use(express.json({ limit: '10kb' }));
 
-// Connect to MongoDB
-const MONGO_URI = process.env.NODE_ENV === 'production' ? process.env.MONGO_URI_PROD : process.env.MONGO_URI_DEV;
-
-if (!MONGO_URI) {
-  console.error('MongoDB URI is not defined in environment variables');
-  process.exit(1);
-}
-
-mongoose
-  .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log('MongoDB Connected'))
-  .catch((err) => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1);
-  });
-
-// Middleware
+//Middleware
+app.use(cors());
 app.use(express.json());
 
-// CORS configuration
+// Sanitize request data to prevent NoSQL injection
+//    This will remove any keys beginning with '$' or containing '.'
+app.use(mongoSanitize());
+
+// Protect against HTTP Parameter Pollution
+//    (e.g. foo=1&foo=2 attacks)
 app.use(
-  cors({
-    origin: true, // Reflect the request origin
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    credentials: true,
-    maxAge: 86400,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
+  hpp({
+    whitelist: ['sort', 'fields'],
   }),
 );
 
-// Add headers for better CORS support
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  res.header('Access-Control-Allow-Credentials', 'true');
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  next();
-});
-
-// Session middleware
+//security implementations !
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'your-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    proxy: true, // Required for Heroku/Render SSL support
-    cookie: {
-      secure: process.env.NODE_ENV === 'production', // Only send cookie over HTTPS in production
-      httpOnly: true, // Prevents client-side access to the cookie
-      sameSite: 'none', // Required for cross-site requests
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined, // Adjust domain for production
-    },
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV !== 'development', // Enable CSP in production
+    crossOriginEmbedderPolicy: process.env.NODE_ENV !== 'development',
   }),
 );
 
-// Initialize passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Setup Logging
+// Ensure the 'logs' directory exists
+const logDirectory = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDirectory)) {
+  fs.mkdirSync(logDirectory);
+}
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+// Create a rotating write stream
+const accessLogStream = rfs.createStream('access.log', {
+  interval: '1d', // rotate daily
+  size: '10M', // rotate when log size reaches 10MB
+  compress: 'gzip', // compress rotated files
+  path: logDirectory,
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Setup morgan to log requests to the console and to a file
+app.use(morgan('combined', { stream: accessLogStream }));
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  console.error('Stack:', err.stack);
-  res.status(500).json({
-    success: false,
-    message: 'Server error',
-    error: err.message,
-  });
-});
+// RateLmiter & slowDown
+app.use(limiter);
+app.use(speedLimiter);
 
+// Mount our API routes
+app.use('/api/labels', labelRoutes);
+
+// Fallbacks
+app.use(notFound);
+app.use(errorHandler);
+
+// Start server
 const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-  console.log('CORS enabled for all origins with credentials support');
-  console.log('Session cookie configured for cross-origin access');
+// Graceful Shutdown Handler
+const handleShutdown = async (signal) => {
+  console.log(`Received ${signal}. Shutting down gracefully...`);
+  try {
+    // Stop accepting new connections
+    server.close(() => {
+      console.log('HTTP server closed.');
+
+      // Close MongoDB connection
+      mongoose.disconnect().then(() => {
+        console.log('MongoDB connection closed.');
+        process.exit(0); // Exit the process
+      });
+    });
+
+    // If server.close() takes too long, force exit
+    setTimeout(() => {
+      console.error('Shutdown timed out. Forcing exit.');
+      process.exit(1); // Force exit after timeout
+    }, 10000); // 10 seconds timeout
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1); // Exit with error
+  }
+};
+
+// Listen for Termination Signals
+process.on('SIGINT', () => handleShutdown('SIGINT')); // Ctrl+C
+process.on('SIGTERM', () => handleShutdown('SIGTERM')); // Docker/Kubernetes
+
+//Look for uncaught exceptions and unhandled rejections
+// This is a good place to log the error and perform cleanup if necessary
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception', err);
+  handleShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection', reason);
+  handleShutdown('unhandledRejection');
 });
