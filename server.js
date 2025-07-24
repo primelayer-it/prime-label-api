@@ -24,8 +24,25 @@ const app = express();
 // Protects against very large payloads DOS’ing your server.
 app.use(express.json({ limit: '10kb' }));
 
+// CORS Configuration
+const allowedOrigins = ['http://www.clinicallabel.io', 'http://localhost:5173', 'https://prime-label-frontend.vercel.app'];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400, // 24 hours
+};
+
 //Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Sanitize request data to prevent NoSQL injection
